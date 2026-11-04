@@ -37,7 +37,7 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* Moldura de proporção 9:16 em telas grandes e full-screen em celulares */
+        /* Moldura 9:16 no celular; estação operacional ampla no computador. */
         .mobile-container {
             width: 100%;
             max-width: 440px;
@@ -48,6 +48,29 @@
             position: relative;
             overflow: hidden;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        @media (min-width: 1024px) {
+            body {
+                min-height: 100vh;
+                overflow: auto;
+                padding: 24px;
+                align-items: flex-start;
+                background:
+                    radial-gradient(circle at 15% 10%, rgba(6, 182, 212, 0.16), transparent 30%),
+                    radial-gradient(circle at 85% 90%, rgba(20, 184, 166, 0.12), transparent 32%),
+                    #020617;
+            }
+
+            .mobile-container {
+                width: min(1440px, 100%);
+                max-width: 1440px;
+                height: calc(100vh - 48px);
+                max-height: none;
+                min-height: 720px;
+                border-radius: 28px;
+                box-shadow: 0 30px 80px -30px rgba(6, 182, 212, 0.30);
+            }
         }
 
         /* Animação da mira laser do QR Code */
@@ -113,7 +136,10 @@
                         {{ isOnline ? 'Online' : 'Offline' }}
                     </span>
 
-                    <a href="../" title="Voltar ao Painel do Gestor" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 text-xs transition">
+                    <a href="../morador/index.html" title="Abrir Cartão do Morador" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 text-xs transition">
+                        <i class="fa-solid fa-id-card"></i>
+                    </a>
+                    <a href="../index.html" title="Voltar ao Painel do Gestor" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 text-xs transition">
                         <i class="fa-solid fa-chart-line"></i>
                     </a>
                 </div>
@@ -137,10 +163,10 @@
         </header>
 
         <!-- Main Content Area -->
-        <main class="flex-1 overflow-y-auto no-scrollbar p-4 flex flex-col gap-4">
+        <main class="flex-1 overflow-y-auto no-scrollbar p-4 flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(360px,0.9fr)_minmax(420px,1.1fr)_minmax(300px,0.75fr)] lg:items-start lg:gap-5 lg:p-6">
 
             <!-- Card 1: Scanner de QR Code do Morador -->
-            <section class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl relative overflow-hidden">
+            <section class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl relative overflow-hidden lg:h-full">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
                         <div class="w-6 h-6 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xs">
@@ -159,7 +185,7 @@
                 </div>
 
                 <!-- Visor da Câmera / html5-qrcode -->
-                <div class="relative w-full aspect-square max-h-56 bg-black rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                <div class="relative w-full aspect-square max-h-56 bg-black rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center lg:max-h-none lg:min-h-[380px]">
                     
                     <div id="qr-reader" class="w-full h-full" style="display: flex; align-items: center; justify-content: center;"></div>
 
@@ -211,7 +237,7 @@
             </section>
 
             <!-- Card 2: Seleção de Material e Pesagem -->
-            <section class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+            <section class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl flex flex-col gap-3 lg:h-full lg:justify-center">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <div class="w-6 h-6 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center text-xs">
@@ -226,11 +252,11 @@
                 </div>
 
                 <!-- Grid de Materiais -->
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-3 gap-2 lg:gap-3">
                     <button v-for="mat in materiais" :key="mat.id" @click="selectedMaterial = mat"
                             type="button"
                             :class="selectedMaterial?.id === mat.id ? 'ring-2 ring-cyan-400 bg-cyan-950/70 border-cyan-400/60 text-white' : 'bg-slate-900 hover:bg-slate-850 border-slate-800 text-slate-300'"
-                            class="p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95">
+                            class="p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 lg:min-h-28">
                         <i :class="['fa-solid', mat.icon]" :style="{ color: mat.color }" class="text-lg"></i>
                         <span class="text-[11px] font-semibold leading-tight text-center">{{ mat.name }}</span>
                     </button>
@@ -269,7 +295,7 @@
             </section>
 
             <!-- Card 3: Histórico Rápido do Turno -->
-            <section class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl">
+            <section class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl lg:h-full lg:flex lg:flex-col">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
                         <div class="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xs">
@@ -286,7 +312,7 @@
                     Nenhuma entrega registrada nesta sessão ainda.
                 </div>
 
-                <div v-else class="flex flex-col gap-2 max-h-40 overflow-y-auto no-scrollbar pr-1">
+                <div v-else class="flex flex-col gap-2 max-h-40 overflow-y-auto no-scrollbar pr-1 lg:max-h-none lg:flex-1">
                     <div v-for="item in historicoTurno" :key="item.id" 
                          class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
                         <div class="flex items-center gap-2">

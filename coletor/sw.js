@@ -3,7 +3,7 @@
  * Garante funcionamento 100% offline para o coletor
  */
 
-const CACHE_NAME = 'recicla-coletor-v1';
+const CACHE_NAME = 'recicla-coletor-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

@@ -39,6 +39,7 @@
 
         #map {
             height: 100%;
+            min-height: 360px;
             width: 100%;
             border-radius: 0.75rem;
             z-index: 1;
@@ -151,13 +152,13 @@
 
             <!-- Ações Rápidas e Links para outras telas -->
             <div class="flex items-center gap-3">
-                <a href="./coletor/" target="_blank"
+                <a href="./coletor/index.html"
                    class="bg-slate-900 hover:bg-cyan-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-md hover:shadow-cyan-500/20 flex items-center gap-2">
                     <i class="fa-solid fa-mobile-screen-button text-cyan-400"></i>
                     <span>Abrir App Coletor (9:16)</span>
                 </a>
 
-                <a href="./morador/" target="_blank"
+                <a href="./morador/index.html"
                    class="bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl transition-all border border-slate-200 shadow-sm flex items-center gap-2">
                     <i class="fa-solid fa-qrcode text-indigo-500"></i>
                     <span>Cartão do Morador</span>
@@ -182,7 +183,7 @@
         <main class="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
 
             <!-- Left Column: Map (Interactive) -->
-            <section class="lg:w-7/12 xl:w-2/3 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col overflow-hidden relative">
+            <section class="lg:w-7/12 xl:w-2/3 min-h-[440px] lg:min-h-0 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col overflow-hidden relative">
                 <div class="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-earth-americas text-cyan-500 text-lg"></i>
@@ -200,7 +201,7 @@
                     </div>
                 </div>
 
-                <div class="flex-1 relative p-2 bg-slate-50">
+                <div class="flex-1 min-h-[376px] lg:min-h-0 relative p-2 bg-slate-50">
                     <div v-if="!mapLoaded" class="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
                         <i class="fa-solid fa-circle-notch fa-spin text-cyan-500 text-4xl"></i>
                     </div>
@@ -532,10 +533,10 @@
 
                     leafletMap.on('click', closePointDetails);
 
-                    setTimeout(() => {
+                    requestAnimationFrame(() => setTimeout(() => {
                         leafletMap.invalidateSize();
                         mapLoaded.value = true;
-                    }, 400);
+                    }, 400));
                 };
 
                 // Inicialização do Gráfico Chart.js
