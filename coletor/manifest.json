@@ -1,0 +1,22 @@
+{
+  "name": "Recicla+ Coletor",
+  "short_name": "Coletor",
+  "description": "Aplicativo do Coletor para Registro de Coleta Seletiva em Coxim e MS",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#06b6d4",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='38' fill='%2306b6d4'/%3E%3Cpath d='M96 40 L136 100 L112 100 L112 144 L80 144 L80 100 L56 100 Z' fill='white'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%2306b6d4'/%3E%3Cpath d='M256 100 L360 260 L300 260 L300 380 L212 380 L212 260 L152 260 Z' fill='white'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

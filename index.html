@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recicla+ Dashboard Gestor — Coxim, MS</title>
+
+    <!-- Tailwind 4 via CDN -->
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+
+    <!-- Vue 3 via CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <!-- Dexie 4 via CDN -->
+    <script src="https://unpkg.com/dexie@4/dist/dexie.js"></script>
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Shared Dexie Database Module -->
+    <script src="./shared/db.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 0.75rem;
+            z-index: 1;
+        }
+
+        /* Animações CSS Customizadas dos Marcadores */
+        .pulse-marker-active {
+            width: 18px;
+            height: 18px;
+            background-color: #06b6d4;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7);
+            animation: pulse-cyan 2s infinite;
+        }
+
+        .pulse-marker-maintenance {
+            width: 18px;
+            height: 18px;
+            background-color: #f43f5e;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7);
+            animation: pulse-rose 2s infinite;
+        }
+
+        @keyframes pulse-cyan {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(6, 182, 212, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+            }
+        }
+
+        @keyframes pulse-rose {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(244, 63, 94, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+            }
+        }
+
+        .fade-slide-enter-active,
+        .fade-slide-leave-active {
+            transition: all 0.4s ease;
+        }
+
+        .fade-slide-enter-from,
+        .fade-slide-leave-to {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        @media (min-width: 1024px) {
+            html,
+            body,
+            #app {
+                height: 100vh;
+                overflow: hidden;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased h-screen w-screen overflow-hidden flex flex-col">
+
+    <div id="app" class="h-full w-full flex flex-col p-4 lg:p-6 mx-auto max-w-[1920px]">
+
+        <!-- Header do Gestor -->
+        <header class="flex justify-between items-center mb-5 shrink-0 bg-white/70 backdrop-blur-md px-6 py-4 rounded-2xl shadow-sm border border-white/60">
+            <div class="flex items-center gap-4">
+                <div class="bg-gradient-to-br from-cyan-500 to-indigo-600 text-white p-3 rounded-xl shadow-lg transform transition hover:rotate-12">
+                    <i class="fa-solid fa-layer-group text-2xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-2xl font-black text-slate-800 tracking-tight leading-tight">Recicla+ <span class="text-cyan-600 font-light">Painel do Gestor</span></h1>
+                        <span class="bg-cyan-100 text-cyan-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-cyan-200">v0 • Dexie 4</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium">Monitoramento de Coleta Seletiva Municipal • Coxim, MS</p>
+                </div>
+            </div>
+
+            <!-- Ações Rápidas e Links para outras telas -->
+            <div class="flex items-center gap-3">
+                <a href="./coletor/" target="_blank"
+                   class="bg-slate-900 hover:bg-cyan-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-md hover:shadow-cyan-500/20 flex items-center gap-2">
+                    <i class="fa-solid fa-mobile-screen-button text-cyan-400"></i>
+                    <span>Abrir App Coletor (9:16)</span>
+                </a>
+
+                <a href="./morador/" target="_blank"
+                   class="bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl transition-all border border-slate-200 shadow-sm flex items-center gap-2">
+                    <i class="fa-solid fa-qrcode text-indigo-500"></i>
+                    <span>Cartão do Morador</span>
+                </a>
+
+                <button @click="modalHistoricoAberto = true"
+                        class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-3.5 py-2 rounded-xl transition-all border border-indigo-100 flex items-center gap-2">
+                    <i class="fa-solid fa-database text-indigo-500"></i>
+                    <span>Ver Banco Local ({{ totalEntregas }})</span>
+                </button>
+
+                <div class="text-right hidden xl:flex flex-col items-end border-l border-slate-200 pl-4 ml-1">
+                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Banco Local</p>
+                    <p class="text-xs font-semibold text-emerald-600 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Dexie 'recicla' Ativo
+                    </p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area (16:9 Grid) -->
+        <main class="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
+
+            <!-- Left Column: Map (Interactive) -->
+            <section class="lg:w-7/12 xl:w-2/3 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col overflow-hidden relative">
+                <div class="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-earth-americas text-cyan-500 text-lg"></i>
+                        <h2 class="font-bold text-slate-700 text-base">
+                            Rede de Ecopontos em Coxim-MS
+                        </h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-bold">
+                            {{ activePoints }} operacionais / {{ points.length }} total
+                        </span>
+                        <span class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full font-bold uppercase tracking-wide border border-indigo-100 shadow-sm hidden sm:inline-block">
+                            Clique em um ponto
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex-1 relative p-2 bg-slate-50">
+                    <div v-if="!mapLoaded" class="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
+                        <i class="fa-solid fa-circle-notch fa-spin text-cyan-500 text-4xl"></i>
+                    </div>
+
+                    <!-- Map Container Leaflet -->
+                    <div id="map" class="shadow-inner"></div>
+
+                    <!-- Overlay Interativo do Ponto Selecionado -->
+                    <transition name="fade-slide">
+                        <div v-if="selectedPoint"
+                            class="absolute top-6 left-6 z-[1000] bg-white/95 backdrop-blur-xl p-5 rounded-2xl shadow-2xl border border-white w-80">
+                            <button @click="closePointDetails"
+                                class="absolute top-3 right-3 text-slate-400 hover:text-rose-500 transition-colors bg-slate-100 hover:bg-rose-50 rounded-full w-8 h-8 flex items-center justify-center">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+
+                            <div class="flex items-center gap-3 mb-3">
+                                <div :class="selectedPoint.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'"
+                                    class="p-2.5 rounded-xl">
+                                    <i :class="selectedPoint.status === 'active' ? 'fa-solid fa-check' : 'fa-solid fa-wrench'"
+                                        class="text-lg"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-800 leading-tight">{{ selectedPoint.name }}</h3>
+                                    <p class="text-xs text-slate-500 font-medium">Bairro {{ selectedPoint.bairro || 'Coxim' }}</p>
+                                    <p class="text-[11px] font-bold uppercase tracking-wider"
+                                        :class="selectedPoint.status === 'active' ? 'text-emerald-500' : 'text-rose-500'">
+                                        {{ selectedPoint.status === 'active' ? '● Operacional' : '● Em Manutenção' }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Métricas de Coleta deste Ecoponto -->
+                            <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-500 font-semibold">Volume Registrado:</span>
+                                    <span class="font-black text-slate-800">{{ formatNumber(selectedPoint.totalKg || 0) }} kg</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-500 font-semibold">Entregas no Local:</span>
+                                    <span class="font-black text-cyan-600">{{ selectedPoint.totalEntregas || 0 }}</span>
+                                </div>
+
+                                <div class="pt-1">
+                                    <div class="flex justify-between items-end mb-1">
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Ocupação da Caçamba</span>
+                                        <span class="text-xs font-black text-slate-800">{{ selectedPoint.capacidadeCalculada || '0%' }}</span>
+                                    </div>
+                                    <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                                        <div class="h-full transition-all duration-1000 ease-out rounded-full"
+                                            :class="getCapacityColor(selectedPoint.capacidadeCalculada || '0%')"
+                                            :style="{ width: selectedPoint.capacidadeCalculada === 'N/A' ? '0%' : selectedPoint.capacidadeCalculada }">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botão de Solicitar Coleta -->
+                            <button v-if="selectedPoint.capacidadeCalculada !== 'N/A' && selectedPoint.capacidadeCalculada !== '0%'"
+                                @click="emptyContainer"
+                                class="mt-4 w-full bg-slate-900 hover:bg-cyan-600 text-white font-semibold py-2.5 rounded-xl transition-all shadow-md hover:shadow-lg flex justify-center items-center gap-2 text-xs">
+                                <i class="fa-solid fa-truck-fast"></i> Solicitar Esvaziamento
+                            </button>
+                            <div v-else-if="selectedPoint.capacidadeCalculada === '0%'"
+                                class="mt-4 text-center text-xs font-bold text-emerald-600 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
+                                <i class="fa-solid fa-leaf mr-1"></i> Caçamba Disponível
+                            </div>
+                        </div>
+                    </transition>
+                </div>
+            </section>
+
+            <!-- Right Column: KPIs and Chart -->
+            <section class="lg:w-5/12 xl:w-1/3 flex flex-col gap-4 min-h-0 overflow-y-auto lg:overflow-visible pr-2 lg:pr-0">
+
+                <!-- Indicators (KPIs) com dados reais do Dexie -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3 gap-3 shrink-0">
+
+                    <!-- KPI 1: Volume Total -->
+                    <div class="bg-white p-4 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-slate-100 group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="bg-cyan-50 text-cyan-600 p-2 rounded-lg group-hover:bg-cyan-600 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-weight-scale"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <i class="fa-solid fa-arrow-trend-up"></i> +{{ totalEntregas }} coletas
+                            </span>
+                        </div>
+                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Volume Total</h3>
+                        <div class="flex items-baseline gap-1">
+                            <span class="text-2xl xl:text-3xl font-black text-slate-800">{{ formatNumber(totalKg) }}</span>
+                            <span class="text-xs font-bold text-slate-400">kg</span>
+                        </div>
+                    </div>
+
+                    <!-- KPI 2: Material Líder -->
+                    <div class="bg-white p-4 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-slate-100 group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="bg-amber-50 text-amber-500 p-2 rounded-lg group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-trophy"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">
+                                {{ topMaterialPercentage }}% do total
+                            </span>
+                        </div>
+                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Líder em Coleta</h3>
+                        <div class="text-xl xl:text-2xl font-black text-slate-800 truncate" :title="topMaterial.name">
+                            {{ topMaterial.name }}
+                        </div>
+                    </div>
+
+                    <!-- KPI 3: Ecopontos Ativos -->
+                    <div class="bg-white p-4 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-slate-100 group relative overflow-hidden">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="bg-indigo-50 text-indigo-600 p-2 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-satellite-dish"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                                Coxim/MS
+                            </span>
+                        </div>
+                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Ecopontos</h3>
+                        <div class="flex items-baseline gap-1">
+                            <span class="text-2xl xl:text-3xl font-black text-cyan-600">{{ activePoints }}</span>
+                            <span class="text-xs font-bold text-slate-400">/ {{ points.length }} ativos</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Area: Distribuição dos Materiais -->
+                <div class="bg-white rounded-2xl shadow-xl border border-slate-100 flex-1 flex flex-col overflow-hidden min-h-[290px]">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+                        <div>
+                            <h2 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-chart-pie text-cyan-500"></i> Composição dos Resíduos
+                            </h2>
+                            <p class="text-[11px] text-slate-400">Distribuição atual dos materiais pesados (kg)</p>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
+                            Tempo Real
+                        </span>
+                    </div>
+                    <div class="p-4 flex-1 flex flex-col justify-center items-center relative w-full">
+                        <div v-if="!chartLoaded" class="absolute inset-0 flex items-center justify-center bg-white z-10">
+                            <i class="fa-solid fa-circle-notch fa-spin text-cyan-500 text-3xl"></i>
+                        </div>
+                        <div class="w-full h-full relative" style="min-height: 220px;">
+                            <canvas id="materialsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+
+        <!-- Modal / Painel Lateral: Registro do Banco Local Dexie -->
+        <div v-if="modalHistoricoAberto" 
+             class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+                <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
+                            <i class="fa-solid fa-database"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base leading-tight">Banco Local Dexie: tabela `entregas`</h3>
+                            <p class="text-xs text-slate-500">Total de {{ totalEntregas }} registros persistidos no navegador</p>
+                        </div>
+                    </div>
+                    <button @click="modalHistoricoAberto = false" 
+                            class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-4 space-y-2">
+                    <div v-for="ent in ultimasEntregas" :key="ent.id" 
+                         class="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-3">
+                            <span class="w-7 h-7 rounded-lg bg-cyan-100 text-cyan-700 font-bold flex items-center justify-center text-[10px]">
+                                #{{ ent.id }}
+                            </span>
+                            <div>
+                                <p class="font-bold text-slate-800">{{ ent.morador_nome }} <span class="font-normal text-slate-500">({{ ent.morador_bairro }})</span></p>
+                                <p class="text-[11px] text-slate-400">
+                                    {{ ent.ecoponto_nome }} • Coletor: {{ ent.coletor_nome }} • {{ formatarData(ent.data_hora) }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-black text-slate-800 text-sm">{{ ent.peso_kg }} kg</span>
+                            <span class="block text-[10px] uppercase font-bold text-cyan-600">{{ ent.material }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs">
+                    <span class="text-slate-500 font-medium">Sincronizado automaticamente via Dexie 4</span>
+                    <button @click="modalHistoricoAberto = false" class="bg-slate-900 text-white px-4 py-2 rounded-xl font-bold hover:bg-slate-800 transition">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Script Vue 3 do Painel do Gestor -->
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                const mapLoaded = ref(false);
+                const chartLoaded = ref(false);
+                const modalHistoricoAberto = ref(false);
+                let leafletMap = null;
+                let chartInstance = null;
+                const markerMap = new Map();
+
+                // Estado Reativo dos Materiais e Métricas
+                const materialsData = ref([]);
+                const points = ref([]);
+                const selectedPoint = ref(null);
+                const totalKg = ref(0);
+                const totalEntregas = ref(0);
+                const topMaterial = ref({ name: 'N/A', kg: 0 });
+                const topMaterialPercentage = ref(0);
+                const ultimasEntregas = ref([]);
+
+                const activePoints = computed(() => points.value.filter(p => p.status === 'active').length);
+
+                const formatNumber = (num) => new Intl.NumberFormat('pt-BR').format(num || 0);
+
+                const formatarData = (iso) => {
+                    if (!iso) return '';
+                    const d = new Date(iso);
+                    return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                };
+
+                const getCapacityColor = (capacityStr) => {
+                    if (!capacityStr || capacityStr === 'N/A') return 'bg-slate-300';
+                    const val = parseInt(capacityStr);
+                    if (val >= 85) return 'bg-rose-500';
+                    if (val >= 60) return 'bg-amber-500';
+                    return 'bg-cyan-500';
+                };
+
+                const closePointDetails = () => {
+                    selectedPoint.value = null;
+                    if (leafletMap) leafletMap.setView([-18.5029, -54.7570], 13);
+                };
+
+                const emptyContainer = async () => {
+                    if (selectedPoint.value) {
+                        const targetId = selectedPoint.value.id;
+                        if (window.ReciclaDB) {
+                            await window.ReciclaDB.esvaziarEcoponto(targetId);
+                        }
+                        const pt = points.value.find(p => p.id === targetId);
+                        if (pt) {
+                            pt.capacidadeCalculada = '0%';
+                            selectedPoint.value.capacidadeCalculada = '0%';
+                        }
+                    }
+                };
+
+                // Carregar dados de estatísticas e ecopontos do Dexie
+                const carregarDadosDoBanco = async () => {
+                    if (!window.ReciclaDB) return;
+
+                    await window.ReciclaDB.seedDadosIniciaisSeVazio();
+
+                    const stats = await window.ReciclaDB.obterEstatisticasGerais();
+                    totalKg.value = stats.totalKg;
+                    totalEntregas.value = stats.totalEntregas;
+                    topMaterial.value = stats.topMaterial;
+                    topMaterialPercentage.value = stats.topMaterialPorcentagem;
+                    materialsData.value = stats.materiais;
+
+                    const ecopontosAtualizados = await window.ReciclaDB.obterMetricasPorEcoponto();
+                    points.value = ecopontosAtualizados;
+
+                    ultimasEntregas.value = await window.ReciclaDB.listarEntregas(30);
+
+                    // Atualizar gráfico se já renderizado
+                    if (chartInstance) {
+                        chartInstance.data.labels = materialsData.value.map(d => d.name);
+                        chartInstance.data.datasets[0].data = materialsData.value.map(d => d.kg);
+                        chartInstance.data.datasets[0].backgroundColor = materialsData.value.map(d => d.color);
+                        chartInstance.update();
+                    }
+
+                    // Se ponto estiver selecionado, sincronizar objeto
+                    if (selectedPoint.value) {
+                        const ptAtual = points.value.find(p => p.id === selectedPoint.value.id);
+                        if (ptAtual) selectedPoint.value = ptAtual;
+                    }
+                };
+
+                // Inicialização do Mapa Leaflet
+                const initMap = () => {
+                    leafletMap = L.map('map', { zoomControl: false }).setView([-18.5029, -54.7570], 13);
+                    L.control.zoom({ position: 'bottomright' }).addTo(leafletMap);
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '&copy; OpenStreetMap contributors'
+                    }).addTo(leafletMap);
+
+                    // Criar marcadores
+                    points.value.forEach(point => {
+                        const iconClass = point.status === 'active' ? 'pulse-marker-active' : 'pulse-marker-maintenance';
+                        const customIcon = L.divIcon({
+                            className: '',
+                            html: `<div class="${iconClass}"></div>`,
+                            iconSize: [18, 18],
+                            iconAnchor: [9, 9]
+                        });
+
+                        const marker = L.marker([point.lat, point.lng], { icon: customIcon }).addTo(leafletMap);
+                        markerMap.set(point.id, marker);
+
+                        marker.on('click', () => {
+                            selectedPoint.value = point;
+                            leafletMap.flyTo([point.lat, point.lng], 16, { duration: 1.2, easeLinearity: 0.25 });
+                        });
+                    });
+
+                    leafletMap.on('click', closePointDetails);
+
+                    setTimeout(() => {
+                        leafletMap.invalidateSize();
+                        mapLoaded.value = true;
+                    }, 400);
+                };
+
+                // Inicialização do Gráfico Chart.js
+                const initChart = () => {
+                    const ctx = document.getElementById('materialsChart').getContext('2d');
+
+                    chartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: materialsData.value.map(d => d.name),
+                            datasets: [{
+                                data: materialsData.value.map(d => d.kg),
+                                backgroundColor: materialsData.value.map(d => d.color),
+                                borderWidth: 3,
+                                borderColor: '#ffffff',
+                                hoverOffset: 8,
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            layout: { padding: 10 },
+                            plugins: {
+                                legend: {
+                                    position: 'right',
+                                    labels: {
+                                        usePointStyle: true,
+                                        pointStyle: 'circle',
+                                        padding: 16,
+                                        font: { family: "'Inter', sans-serif", size: 12, weight: '500' },
+                                        color: '#334155'
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                    titleFont: { family: "'Inter', sans-serif", size: 13 },
+                                    bodyFont: { family: "'Inter', sans-serif", size: 13, weight: 'bold' },
+                                    padding: 10,
+                                    cornerRadius: 8,
+                                    callbacks: {
+                                        label: (context) => ` ${context.label}: ${formatNumber(context.parsed)} kg`
+                                    }
+                                }
+                            },
+                            cutout: '68%',
+                            animation: { animateScale: true, animateRotate: true }
+                        }
+                    });
+
+                    chartLoaded.value = true;
+                };
+
+                onMounted(async () => {
+                    await carregarDadosDoBanco();
+
+                    nextTick(() => {
+                        initMap();
+                        initChart();
+                    });
+
+                    // Escutar sincronização em tempo real quando o Coletor registrar entregas
+                    if (window.ReciclaDB) {
+                        window.ReciclaDB.onMudanca(async (evento) => {
+                            console.log('[Gestor] Atualização recebida do banco Dexie:', evento);
+                            await carregarDadosDoBanco();
+                        });
+                    }
+                });
+
+                return {
+                    points, totalKg, totalEntregas, topMaterial, topMaterialPercentage, activePoints,
+                    materialsData, ultimasEntregas, modalHistoricoAberto,
+                    formatNumber, formatarData, mapLoaded, chartLoaded,
+                    selectedPoint, closePointDetails, getCapacityColor, emptyContainer
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>

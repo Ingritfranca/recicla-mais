@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-950">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Recicla+ Coletor | App PWA</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#06b6d4">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Tailwind 4 via CDN -->
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+
+    <!-- Vue 3 via CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <!-- Dexie 4 via CDN -->
+    <script src="https://unpkg.com/dexie@4/dist/dexie.js"></script>
+
+    <!-- html5-qrcode 2.3.8 via CDN -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Shared Dexie Database Module -->
+    <script src="../shared/db.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Moldura de proporção 9:16 em telas grandes e full-screen em celulares */
+        .mobile-container {
+            width: 100%;
+            max-width: 440px;
+            height: 100dvh;
+            max-height: 920px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Animação da mira laser do QR Code */
+        @keyframes scanLaser {
+            0% {
+                top: 8%;
+                opacity: 0.3;
+            }
+            50% {
+                top: 88%;
+                opacity: 1;
+            }
+            100% {
+                top: 8%;
+                opacity: 0.3;
+            }
+        }
+
+        .scan-laser-line {
+            position: absolute;
+            left: 5%;
+            right: 5%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #06b6d4, #22d3ee, #06b6d4, transparent);
+            box-shadow: 0 0 14px 2px rgba(6, 182, 212, 0.8);
+            animation: scanLaser 2.2s infinite ease-in-out;
+            pointer-events: none;
+        }
+
+        /* Esconder scrollbar mantendo o scroll suave */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body class="h-full w-full flex items-center justify-center bg-slate-950 text-slate-100 overflow-hidden">
+
+    <div id="app" class="mobile-container bg-slate-900 border border-slate-800 sm:rounded-[36px]">
+
+        <!-- Top Status Bar & Header -->
+        <header class="p-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 shrink-0 z-30">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 to-teal-400 flex items-center justify-center text-slate-950 font-black shadow-md shadow-cyan-500/20">
+                        <i class="fa-solid fa-recycle text-sm"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-sm font-black tracking-tight leading-none text-white">Recicla+ <span class="text-cyan-400 font-semibold">Coletor</span></h1>
+                        <span class="text-[10px] text-slate-400">Coxim • MS</span>
+                    </div>
+                </div>
+
+                <!-- Status de Conectividade / Offline -->
+                <div class="flex items-center gap-2">
+                    <span :class="isOnline ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'"
+                          class="px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1.5 transition-all">
+                        <span class="w-1.5 h-1.5 rounded-full" :class="isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"></span>
+                        {{ isOnline ? 'Online' : 'Offline' }}
+                    </span>
+
+                    <a href="../" title="Voltar ao Painel do Gestor" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 text-xs transition">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Ecoponto & Coletor Ativo -->
+            <div class="flex items-center justify-between text-xs bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                <div class="flex items-center gap-2 min-w-0">
+                    <i class="fa-solid fa-location-dot text-cyan-400 text-xs"></i>
+                    <select v-model="selectedEcopontoId" @change="onEcopontoChange" class="bg-transparent text-white font-medium text-xs focus:outline-none truncate pr-2">
+                        <option v-for="ep in ecopontos" :key="ep.id" :value="ep.id" class="bg-slate-900 text-white">
+                            {{ ep.name }} ({{ ep.bairro }})
+                        </option>
+                    </select>
+                </div>
+                <div class="text-[11px] font-semibold text-slate-400 shrink-0 flex items-center gap-1">
+                    <i class="fa-solid fa-user-tag text-slate-500"></i>
+                    <span>{{ coletorNome }}</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto no-scrollbar p-4 flex flex-col gap-4">
+
+            <!-- Card 1: Scanner de QR Code do Morador -->
+            <section class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl relative overflow-hidden">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-6 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-qrcode"></i>
+                        </div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">1. Identificar Morador</h2>
+                    </div>
+
+                    <!-- Botão de ligar/desligar câmera -->
+                    <button @click="toggleScanner" 
+                            class="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
+                            :class="scannerRunning ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/30' : 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/30'">
+                        <i :class="scannerRunning ? 'fa-solid fa-stop' : 'fa-solid fa-camera'"></i>
+                        {{ scannerRunning ? 'Pausar' : 'Ativar Câmera' }}
+                    </button>
+                </div>
+
+                <!-- Visor da Câmera / html5-qrcode -->
+                <div class="relative w-full aspect-square max-h-56 bg-black rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                    
+                    <div id="qr-reader" class="w-full h-full" style="display: flex; align-items: center; justify-content: center;"></div>
+
+                    <!-- Mira e linha laser quando ativo -->
+                    <div v-if="scannerRunning" class="scan-laser-line"></div>
+
+                    <!-- Overlay de Instrução se desligado -->
+                    <div v-if="!scannerRunning && !moradorAtivo" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-slate-950/80 backdrop-blur-xs">
+                        <i class="fa-solid fa-expand text-cyan-400/40 text-4xl mb-2"></i>
+                        <p class="text-xs font-medium text-slate-300">Aponte para o QR pessoal do morador</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Clique em "Ativar Câmera" ou simule abaixo</p>
+                    </div>
+
+                    <!-- Se morador já identificado -->
+                    <div v-if="moradorAtivo" class="absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center z-20">
+                        <div class="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center text-xl mb-2 animate-bounce">
+                            <i class="fa-solid fa-check"></i>
+                        </div>
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-400">QR Validado</span>
+                        <h3 class="text-sm font-bold text-white mt-0.5">{{ moradorAtivo.nome }}</h3>
+                        <p class="text-xs text-slate-400">{{ moradorAtivo.bairro }} • <span class="font-mono text-cyan-400">{{ moradorAtivo.id }}</span></p>
+
+                        <button @click="resetarMorador" class="mt-3 px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 font-medium transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-arrow-rotate-left"></i> Trocar Morador
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Atalhos de Apoio / Fallback de Teste -->
+                <div v-if="!moradorAtivo" class="mt-3 pt-3 border-t border-slate-800/80">
+                    <div class="flex items-center justify-between gap-2">
+                        <!-- Ler QR de arquivo -->
+                        <label class="cursor-pointer bg-slate-900 hover:bg-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 font-medium flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-image text-cyan-400"></i>
+                            <span>Ler Imagem</span>
+                            <input type="file" accept="image/*" @change="onFileScan" class="hidden">
+                        </label>
+
+                        <!-- Simulador Rápido de Morador -->
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] text-slate-500 font-semibold">Simular:</span>
+                            <button v-for="m in mockMoradoresRapidos" :key="m.id" @click="selecionarMorador(m)" 
+                                    class="bg-slate-900 hover:bg-cyan-950/60 hover:border-cyan-500/50 px-2 py-1 rounded text-[10px] font-medium border border-slate-800 text-cyan-300 transition">
+                                {{ m.nome.split(' ')[0] }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Card 2: Seleção de Material e Pesagem -->
+            <section class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-6 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-scale-balanced"></i>
+                        </div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">2. Material & Peso (kg)</h2>
+                    </div>
+                    <span v-if="selectedMaterial" class="text-xs font-bold text-cyan-400 flex items-center gap-1">
+                        <i :class="['fa-solid', selectedMaterial.icon]"></i>
+                        {{ selectedMaterial.name }}
+                    </span>
+                </div>
+
+                <!-- Grid de Materiais -->
+                <div class="grid grid-cols-3 gap-2">
+                    <button v-for="mat in materiais" :key="mat.id" @click="selectedMaterial = mat"
+                            type="button"
+                            :class="selectedMaterial?.id === mat.id ? 'ring-2 ring-cyan-400 bg-cyan-950/70 border-cyan-400/60 text-white' : 'bg-slate-900 hover:bg-slate-850 border-slate-800 text-slate-300'"
+                            class="p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95">
+                        <i :class="['fa-solid', mat.icon]" :style="{ color: mat.color }" class="text-lg"></i>
+                        <span class="text-[11px] font-semibold leading-tight text-center">{{ mat.name }}</span>
+                    </button>
+                </div>
+
+                <!-- Campo de Entrada de Peso com Teclas Rápidas -->
+                <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-800 mt-1">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-[11px] font-semibold uppercase text-slate-400">Peso Total Entregue:</label>
+                        <div class="flex items-baseline gap-1">
+                            <input type="number" step="0.1" min="0.1" v-model.number="pesoKg" 
+                                   placeholder="0.0" 
+                                   class="w-24 text-right bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-lg font-black text-cyan-400 focus:outline-none focus:border-cyan-400">
+                            <span class="text-xs font-bold text-slate-400">kg</span>
+                        </div>
+                    </div>
+
+                    <!-- Botões de Adição Rápida de Peso -->
+                    <div class="grid grid-cols-5 gap-1.5 pt-1">
+                        <button v-for="qtd in [0.5, 1, 2, 5, 10]" :key="qtd" @click="adicionarPeso(qtd)"
+                                class="bg-slate-800 hover:bg-slate-750 active:bg-cyan-900 text-slate-200 py-1 rounded text-xs font-bold transition">
+                            +{{ qtd }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Botão de Gravação Principal -->
+                <button @click="confirmarEntrega" 
+                        :disabled="!podeGravar || salvando"
+                        :class="podeGravar && !salvando ? 'bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-black shadow-lg shadow-cyan-500/25 active:scale-[0.98]' : 'bg-slate-800 text-slate-500 cursor-not-allowed'"
+                        class="w-full py-3.5 rounded-xl font-black text-sm tracking-wide uppercase transition-all flex items-center justify-center gap-2 mt-1">
+                    <i v-if="salvando" class="fa-solid fa-circle-notch fa-spin"></i>
+                    <i v-else class="fa-solid fa-circle-check text-base"></i>
+                    <span>{{ salvando ? 'Registrando...' : 'Registrar Entrega' }}</span>
+                </button>
+            </section>
+
+            <!-- Card 3: Histórico Rápido do Turno -->
+            <section class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-list-check"></i>
+                        </div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Entregas no Turno</h2>
+                    </div>
+                    <span class="text-xs font-bold text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded-full border border-cyan-800/40">
+                        {{ historicoTurno.length }} registradas
+                    </span>
+                </div>
+
+                <div v-if="historicoTurno.length === 0" class="text-center py-4 text-xs text-slate-500">
+                    Nenhuma entrega registrada nesta sessão ainda.
+                </div>
+
+                <div v-else class="flex flex-col gap-2 max-h-40 overflow-y-auto no-scrollbar pr-1">
+                    <div v-for="item in historicoTurno" :key="item.id" 
+                         class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-xs" :style="{ color: getMaterialColor(item.material) }">
+                                <i :class="['fa-solid', getMaterialIcon(item.material)]"></i>
+                            </div>
+                            <div>
+                                <p class="font-bold text-white text-xs leading-none">{{ item.morador_nome }}</p>
+                                <span class="text-[10px] text-slate-400 font-medium">{{ formatarHora(item.data_hora) }} • {{ item.material }}</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-black text-cyan-400 text-xs">{{ item.peso_kg }} kg</span>
+                            <div class="text-[9px] text-emerald-400 font-semibold flex items-center gap-0.5 justify-end">
+                                <i class="fa-solid fa-database"></i> Dexie
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Toast de Notificação de Sucesso -->
+        <transition enter-active-class="transition duration-300 ease-out" 
+                    enter-from-class="transform translate-y-4 opacity-0" 
+                    enter-to-class="transform translate-y-0 opacity-100" 
+                    leave-active-class="transition duration-200 ease-in" 
+                    leave-from-class="opacity-100" 
+                    leave-to-class="opacity-0">
+            <div v-if="toastMensagem" 
+                 class="absolute bottom-5 left-4 right-4 bg-emerald-500 text-slate-950 font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 z-50">
+                <i class="fa-solid fa-circle-check text-xl"></i>
+                <div class="flex-1 text-xs">
+                    <p class="font-black text-slate-950">{{ toastTitulo }}</p>
+                    <p class="font-medium text-slate-900 leading-tight">{{ toastMensagem }}</p>
+                </div>
+            </div>
+        </transition>
+
+    </div>
+
+    <!-- Script Vue 3 do App Coletor -->
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        createApp({
+            setup() {
+                // Estado de Conectividade
+                const isOnline = ref(navigator.onLine);
+
+                // Dados de Referência
+                const ecopontos = ref(window.ReciclaDB ? window.ReciclaDB.ECOPONTOS : []);
+                const materiais = ref(window.ReciclaDB ? window.ReciclaDB.MATERIAIS : []);
+                const mockMoradoresRapidos = ref(window.ReciclaDB ? window.ReciclaDB.MORADORES_EXEMPLO : []);
+
+                // Sessão do Coletor
+                const coletorNome = ref('Marcos (Coletor #01)');
+                const selectedEcopontoId = ref(1);
+
+                // Formulário de Registro
+                const moradorAtivo = ref(null);
+                const selectedMaterial = ref(materiais.value[0] || null);
+                const pesoKg = ref(null);
+                const salvando = ref(false);
+
+                // Scanner html5-qrcode
+                let html5QrCode = null;
+                const scannerRunning = ref(false);
+
+                // Histórico e Notificação
+                const historicoTurno = ref([]);
+                const toastTitulo = ref('');
+                const toastMensagem = ref('');
+
+                // Beep sonoro de confirmação usando Web Audio API
+                const tocarBeep = () => {
+                    try {
+                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // Nota Lá (A5)
+                        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start();
+                        osc.stop(audioCtx.currentTime + 0.15);
+                    } catch (e) {
+                        // Áudio bloqueado ou não suportado
+                    }
+                    if (navigator.vibrate) {
+                        navigator.vibrate(80);
+                    }
+                };
+
+                const podeGravar = computed(() => {
+                    return moradorAtivo.value && selectedMaterial.value && pesoKg.value && pesoKg.value > 0;
+                });
+
+                const adicionarPeso = (qtd) => {
+                    const atual = Number(pesoKg.value) || 0;
+                    pesoKg.value = parseFloat((atual + qtd).toFixed(1));
+                };
+
+                const getMaterialColor = (id) => {
+                    const m = materiais.value.find(mat => mat.id === id);
+                    return m ? m.color : '#06b6d4';
+                };
+
+                const getMaterialIcon = (id) => {
+                    const m = materiais.value.find(mat => mat.id === id);
+                    return m ? m.icon : 'fa-recycle';
+                };
+
+                const formatarHora = (iso) => {
+                    if (!iso) return '';
+                    const d = new Date(iso);
+                    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                };
+
+                const exibirToast = (titulo, mensagem) => {
+                    toastTitulo.value = titulo;
+                    toastMensagem.value = mensagem;
+                    setTimeout(() => {
+                        toastMensagem.value = '';
+                    }, 3500);
+                };
+
+                // Decodificação do Payload do QR Code do Morador
+                const processarQRPayload = (decodedText) => {
+                    tocarBeep();
+
+                    // Tentativa 1: Formato JSON estruturado
+                    try {
+                        const parsed = JSON.parse(decodedText);
+                        if (parsed.id || parsed.nome) {
+                            moradorAtivo.value = {
+                                id: parsed.id || 'MS-CXM-QR',
+                                nome: parsed.nome || 'Morador Identificado',
+                                bairro: parsed.bairro || 'Coxim - MS'
+                            };
+                            pararScanner();
+                            exibirToast('Morador Identificado!', `${moradorAtivo.value.nome} (${moradorAtivo.value.bairro})`);
+                            return;
+                        }
+                    } catch (e) { }
+
+                    // Tentativa 2: Formato string RECICLA:ID:Nome:Bairro
+                    if (decodedText.startsWith('RECICLA:')) {
+                        const parts = decodedText.split(':');
+                        moradorAtivo.value = {
+                            id: parts[1] || 'MS-CXM-QR',
+                            nome: parts[2] || 'Morador Identificado',
+                            bairro: parts[3] || 'Coxim - MS'
+                        };
+                        pararScanner();
+                        exibirToast('Morador Identificado!', `${moradorAtivo.value.nome} (${moradorAtivo.value.bairro})`);
+                        return;
+                    }
+
+                    // Tentativa 3: Identificador simples (ex: MS-CXM-00101)
+                    const mockFound = mockMoradoresRapidos.value.find(m => m.id === decodedText.trim());
+                    if (mockFound) {
+                        moradorAtivo.value = mockFound;
+                    } else {
+                        moradorAtivo.value = {
+                            id: decodedText.trim(),
+                            nome: 'Morador Registrado',
+                            bairro: 'Coxim - MS'
+                        };
+                    }
+                    pararScanner();
+                    exibirToast('Morador Identificado!', `${moradorAtivo.value.nome}`);
+                };
+
+                // Iniciar scanner de câmera
+                const iniciarScanner = async () => {
+                    try {
+                        if (!html5QrCode) {
+                            html5QrCode = new Html5Qrcode("qr-reader");
+                        }
+                        const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+
+                        await html5QrCode.start(
+                            { facingMode: "environment" },
+                            config,
+                            (decodedText) => {
+                                processarQRPayload(decodedText);
+                            },
+                            (errorMessage) => {
+                                // Scans periódicos sem detecção
+                            }
+                        );
+                        scannerRunning.value = true;
+                    } catch (err) {
+                        console.warn("Erro ao iniciar câmera:", err);
+                        scannerRunning.value = false;
+                        alert("Não foi possível acessar a câmera. Você pode usar a opção 'Ler Imagem' ou 'Simular' para testar.");
+                    }
+                };
+
+                const pararScanner = async () => {
+                    if (html5QrCode && scannerRunning.value) {
+                        try {
+                            await html5QrCode.stop();
+                        } catch (e) { }
+                        scannerRunning.value = false;
+                    }
+                };
+
+                const toggleScanner = () => {
+                    if (scannerRunning.value) {
+                        pararScanner();
+                    } else {
+                        iniciarScanner();
+                    }
+                };
+
+                // Ler QR Code a partir de arquivo de imagem
+                const onFileScan = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    try {
+                        if (!html5QrCode) {
+                            html5QrCode = new Html5Qrcode("qr-reader");
+                        }
+                        const result = await html5QrCode.scanFile(file, true);
+                        processarQRPayload(result);
+                    } catch (err) {
+                        alert("Não foi encontrado um QR Code válido na imagem selecionada.");
+                    }
+                };
+
+                const selecionarMorador = (m) => {
+                    moradorAtivo.value = { ...m };
+                    tocarBeep();
+                    exibirToast('Morador Selecionado!', `${m.nome} (${m.bairro})`);
+                };
+
+                const resetarMorador = () => {
+                    moradorAtivo.value = null;
+                };
+
+                const onEcopontoChange = () => {
+                    const ep = ecopontos.value.find(p => p.id === selectedEcopontoId.value);
+                    if (ep) {
+                        exibirToast('Ecoponto Atualizado', `Trabalhando em: ${ep.name}`);
+                    }
+                };
+
+                // Confirmar e Gravar Entrega no Dexie
+                const confirmarEntrega = async () => {
+                    if (!podeGravar.value || salvando.value) return;
+
+                    salvando.value = true;
+                    try {
+                        const ep = ecopontos.value.find(p => p.id === selectedEcopontoId.value) || ecopontos.value[0];
+
+                        const entregaDados = {
+                            morador_id: moradorAtivo.value.id,
+                            morador_nome: moradorAtivo.value.nome,
+                            morador_bairro: moradorAtivo.value.bairro,
+                            material: selectedMaterial.value.id,
+                            peso_kg: parseFloat(pesoKg.value),
+                            ecoponto_id: ep.id,
+                            ecoponto_nome: ep.name,
+                            coletor_id: 'COL-01',
+                            coletor_nome: coletorNome.value,
+                            data_hora: new Date().toISOString()
+                        };
+
+                        const nova = await window.ReciclaDB.registrarEntrega(entregaDados);
+                        historicoTurno.value.unshift(nova);
+
+                        exibirToast('Entrega Registrada!', `${nova.peso_kg} kg de ${selectedMaterial.value.name} salvos no Dexie.`);
+
+                        // Reset formulário para o próximo morador
+                        pesoKg.value = null;
+                        moradorAtivo.value = null;
+                    } catch (err) {
+                        console.error('Erro ao gravar entrega:', err);
+                        alert('Erro ao gravar entrega no banco local: ' + err.message);
+                    } finally {
+                        salvando.value = false;
+                    }
+                };
+
+                // Carregar entregas recentes do banco Dexie
+                const carregarHistoricoRecente = async () => {
+                    if (window.ReciclaDB) {
+                        await window.ReciclaDB.seedDadosIniciaisSeVazio();
+                        const ultimas = await window.ReciclaDB.listarEntregas(15);
+                        historicoTurno.value = ultimas;
+                    }
+                };
+
+                // Registrar Service Worker para PWA Offline
+                const registrarSW = () => {
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.register('./sw.js').then((reg) => {
+                            console.log('[PWA] Service Worker registrado com escopo:', reg.scope);
+                        }).catch((err) => {
+                            console.warn('[PWA] Falha ao registrar Service Worker:', err);
+                        });
+                    }
+                };
+
+                onMounted(() => {
+                    window.addEventListener('online', () => isOnline.value = true);
+                    window.addEventListener('offline', () => isOnline.value = false);
+
+                    carregarHistoricoRecente();
+                    registrarSW();
+                });
+
+                onUnmounted(() => {
+                    pararScanner();
+                });
+
+                return {
+                    isOnline,
+                    ecopontos,
+                    materiais,
+                    mockMoradoresRapidos,
+                    coletorNome,
+                    selectedEcopontoId,
+                    moradorAtivo,
+                    selectedMaterial,
+                    pesoKg,
+                    salvando,
+                    scannerRunning,
+                    historicoTurno,
+                    toastTitulo,
+                    toastMensagem,
+                    podeGravar,
+                    adicionarPeso,
+                    getMaterialColor,
+                    getMaterialIcon,
+                    formatarHora,
+                    toggleScanner,
+                    onFileScan,
+                    selecionarMorador,
+                    resetarMorador,
+                    onEcopontoChange,
+                    confirmarEntrega
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>
